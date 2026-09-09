@@ -32,6 +32,7 @@ logs/
 
 # Secrets
 *.pem
-*.key
+*.key 
+
 # Python package metadata
 *.egg-info/

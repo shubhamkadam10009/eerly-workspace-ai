@@ -1,12 +1,18 @@
 services:
   postgres:
     image: postgres:16-alpine
+
+    ports:
+      - "5432:5432"
+
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
@@ -18,13 +24,16 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+
     depends_on:
       postgres:
         condition: service_healthy
+
     ports:
       - "8000:8000"
+
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL: postgresql+psycopg://eerly:eerly@postgres:5432/eerly_workspace
 
 volumes:
   postgres_data:

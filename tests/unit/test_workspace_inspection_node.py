@@ -1,4 +1,4 @@
-﻿from unittest.mock import patch
+from unittest.mock import patch
 
 import pytest
 
@@ -48,9 +48,9 @@ def test_inspect_workspace_returns_workspace_files(
         result = inspect_workspace(base_state)
 
     assert len(result["workspace_files"]) == 2
-    assert result["workspace_files"][0].name == "report.txt"
-    assert result["workspace_files"][0].path == "input/report.txt"
-    assert result["workspace_files"][1].name == "data.csv"
+    assert result["workspace_files"][0]["name"] == "report.txt"
+    assert result["workspace_files"][0]["path"] == "input/report.txt"
+    assert result["workspace_files"][1]["name"] == "data.csv"
     assert result["status"] == "workspace_inspected"
     assert result["error"] is None
 

@@ -4,7 +4,6 @@ import selectors
 import pytest
 from sqlalchemy import select
 
-from app.agent.models import ArtifactReference
 from app.agent.nodes.artifact_delivery import deliver_artifact
 from app.artifacts.service import ArtifactService, persist_artifact
 from app.db.models import Artifact
@@ -154,17 +153,13 @@ def test_artifact_delivery_node_returns_artifact_reference(
 
     result = deliver_artifact(state)
 
-    assert isinstance(
-        result["generated_artifact"],
-        ArtifactReference,
-    )
+    assert result["generated_artifact"] == {
+        "filename": "report.md",
+        "relative_path": "delivered/report.md",
+        "artifact_type": "markdown_report",
+        "status": "delivered",
+    }
 
-    artifact = result["generated_artifact"]
-
-    assert artifact.filename == "report.md"
-    assert artifact.relative_path == "delivered/report.md"
-    assert artifact.artifact_type == "markdown_report"
-    assert artifact.status == "delivered"
 
 
 def test_artifact_metadata_persists_in_postgresql():
@@ -331,3 +326,5 @@ def test_resume_agent_persists_approved_artifact():
     assert call_kwargs["response"]["generated_artifact"]["filename"] == (
         "report.md"
     )
+
+

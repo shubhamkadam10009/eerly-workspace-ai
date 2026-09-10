@@ -1,13 +1,4 @@
-from typing import TypedDict
-
-from app.agent.models import (
-    ArtifactReference,
-    Finding,
-    RequestAnalysis,
-    ValidationResult,
-    WorkspaceFile,
-)
-from app.skills.models import SkillMetadata
+﻿from typing import TypedDict
 
 
 class AgentState(TypedDict):
@@ -15,21 +6,21 @@ class AgentState(TypedDict):
     thread_id: str
     request: str
 
-    request_analysis: RequestAnalysis | None
+    request_analysis: dict | None
 
-    discovered_skills: list[SkillMetadata]
+    discovered_skills: list[dict]
     selected_skills: list[str]
     loaded_skills: dict[str, str]
 
-    workspace_files: list[WorkspaceFile]
+    workspace_files: list[dict]
     source_contents: dict[str, str]
 
-    findings: list[Finding]
+    findings: list[dict]
 
     generated_output: str | None
-    generated_artifact: ArtifactReference | None
+    generated_artifact: dict | None
 
-    validation_result: ValidationResult | None
+    validation_result: dict | None
 
     approval_request: dict | None
     approval_status: str | None

@@ -25,11 +25,10 @@ from app.agent.state import AgentState
 def route_after_validation(state: AgentState) -> str:
     validation_result = state.get("validation_result")
 
-    if validation_result and validation_result.valid:
+    if validation_result and validation_result["valid"]:
         return "prepare_approval"
 
     return "end"
-
 
 def route_after_approval(state: AgentState) -> str:
     decision = state.get("approval_decision")

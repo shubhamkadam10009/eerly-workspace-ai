@@ -1,4 +1,4 @@
-from app.agent.state import AgentState
+﻿from app.agent.state import AgentState
 from app.agent.structured_llm import (
     build_report_generation_messages,
     get_report_generation_llm,
@@ -33,14 +33,20 @@ def generate_output(state: AgentState) -> dict:
         for name, instructions in state["loaded_skills"].items()
     )
 
-    findings = "\n".join(
-        (
-            f"- [{finding.confidence}] "
-            f"{finding.statement} "
-            f"(source: {finding.source_path})"
+    finding_lines: list[str] = []
+
+    for finding in state["findings"]:
+        confidence = finding["confidence"]
+        statement = finding["statement"]
+        source_path = finding["source_path"]
+
+        finding_lines.append(
+            f"- [{confidence}] "
+            f"{statement} "
+            f"(source: {source_path})"
         )
-        for finding in state["findings"]
-    )
+
+    findings = "\n".join(finding_lines)
 
     messages = build_report_generation_messages(
         request=state["request"],

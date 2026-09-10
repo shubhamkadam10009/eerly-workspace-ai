@@ -284,7 +284,6 @@ def _persist_generated_artifact(
     with ThreadPoolExecutor(max_workers=1) as executor:
         executor.submit(asyncio.run, persist()).result()
 
-
 def _publish_terminal_event(
     *,
     user_id: str,

@@ -1,4 +1,4 @@
-﻿import uuid
+import uuid
 
 from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.graph import END, START, StateGraph
@@ -8,12 +8,12 @@ from typing_extensions import TypedDict
 from app.core.config import get_settings
 
 
-class TestState(TypedDict):
+class CheckpointState(TypedDict):
     message: str
     approval: str | None
 
 
-def ask_for_approval(state: TestState):
+def ask_for_approval(state: CheckpointState):
     decision = interrupt({
         "type": "approval",
         "message": "Approve this test execution?"
@@ -24,14 +24,14 @@ def ask_for_approval(state: TestState):
     }
 
 
-def finish(state: TestState):
+def finish(state: CheckpointState):
     return {
         "message": f"completed:{state['approval']}"
     }
 
 
 def build_graph(checkpointer):
-    builder = StateGraph(TestState)
+    builder = StateGraph(CheckpointState)
 
     builder.add_node("approval", ask_for_approval)
     builder.add_node("finish", finish)

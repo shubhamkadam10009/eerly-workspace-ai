@@ -1,4 +1,4 @@
-﻿from app.agent.models import WorkspaceFile
+from app.agent.models import WorkspaceFile
 from app.agent.state import AgentState
 from app.tools.filesystem import list_workspace_files
 
@@ -17,7 +17,7 @@ def inspect_workspace(state: AgentState) -> dict:
     )
 
     workspace_files = [
-        WorkspaceFile.model_validate(entry)
+        WorkspaceFile.model_validate(entry).model_dump()
         for entry in entries
     ]
 

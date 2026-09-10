@@ -1,4 +1,4 @@
-from app.agent.state import AgentState
+﻿from app.agent.state import AgentState
 from app.agent.structured_llm import (
     build_content_analysis_messages,
     get_content_analysis_llm,
@@ -40,8 +40,13 @@ def analyze_content(state: AgentState) -> dict:
 
     result = get_content_analysis_llm().invoke(messages)
 
+    findings = [
+        finding.model_dump()
+        for finding in result.findings
+    ]
+
     return {
-        "findings": result.findings,
+        "findings": findings,
         "status": "content_analyzed",
         "error": None,
     }

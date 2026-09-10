@@ -27,14 +27,14 @@ def state() -> AgentState:
         "user_id": "user_a",
         "thread_id": "user_a:thread_1",
         "request": "Create a management report from my documents.",
-        "request_analysis": RequestAnalysis(
-            intent="reporting",
-            selected_skills=[
+        "request_analysis": {
+            "intent": "reporting",
+            "selected_skills": [
                 "document_analysis",
                 "report_generation",
             ],
-            requested_output_type="report",
-        ),
+            "requested_output_type": "report",
+        },
         "discovered_skills": [],
         "selected_skills": [
             "document_analysis",
@@ -49,11 +49,11 @@ def state() -> AgentState:
             "input/report.txt": "Revenue increased by 18%.",
         },
         "findings": [
-            Finding(
-                statement="Revenue increased by 18%.",
-                source_path="input/report.txt",
-                confidence="high",
-            )
+            {
+                "statement": "Revenue increased by 18%.",
+                "source_path": "input/report.txt",
+                "confidence": "high",
+            }
         ],
         "generated_output": None,
         "generated_artifact": None,
@@ -82,7 +82,7 @@ def test_content_analysis_returns_structured_findings(state):
         result = analyze_content(state)
 
     assert len(result["findings"]) == 1
-    assert result["findings"][0].source_path == "input/report.txt"
+    assert result["findings"][0]["source_path"] == "input/report.txt"
     assert result["status"] == "content_analyzed"
 
 
@@ -119,8 +119,8 @@ def test_output_validation_accepts_valid_output(state):
 
     result = validate_output(state)
 
-    assert result["validation_result"].valid is True
-    assert result["validation_result"].issues == []
+    assert result["validation_result"]["valid"] is True
+    assert result["validation_result"]["issues"] == []
     assert result["status"] == "output_validated"
 
 
@@ -129,9 +129,9 @@ def test_output_validation_rejects_empty_output(state):
 
     result = validate_output(state)
 
-    assert result["validation_result"].valid is False
+    assert result["validation_result"]["valid"] is False
     assert "Generated output is empty" in (
-        result["validation_result"].issues
+        result["validation_result"]["issues"]
     )
 
 
@@ -141,7 +141,7 @@ def test_output_validation_rejects_no_findings_when_sources_exist(state):
 
     result = validate_output(state)
 
-    assert result["validation_result"].valid is False
+    assert result["validation_result"]["valid"] is False
 
 
 def test_build_graph_has_all_nodes():
@@ -204,7 +204,7 @@ def test_thread_ids_are_user_namespaced():
             "selected_skills": [],
             "findings": [],
             "generated_output": "A generated report.",
-            "validation_result": ValidationResult(valid=True),
+            "validation_result": {"valid": True, "issues": []},
         }
 
         mock_get_graph.return_value = graph
@@ -246,7 +246,7 @@ def test_api_accepts_valid_jwt():
         "selected_skills": ["document_analysis"],
         "findings": [],
         "generated_output": "A generated report.",
-        "validation_result": ValidationResult(valid=True),
+        "validation_result": {"valid": True, "issues": []},
     }
 
     with patch(
@@ -310,10 +310,7 @@ def test_output_validation_returns_pydantic_model(state):
 
     result = validate_output(state)
 
-    assert isinstance(
-        result["validation_result"],
-        ValidationResult,
-    )
+    assert isinstance(result["validation_result"], dict)
 
 
 def test_graph_uses_persistent_thread_configuration():

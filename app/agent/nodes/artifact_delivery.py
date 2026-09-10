@@ -1,4 +1,4 @@
-from typing import Any
+﻿from typing import Any
 
 from app.agent.models import ArtifactReference
 from app.agent.state import AgentState
@@ -33,7 +33,7 @@ def deliver_artifact(state: AgentState) -> dict[str, Any]:
     )
 
     return {
-        "generated_artifact": artifact,
+        "generated_artifact": artifact.model_dump(),
         "status": "delivered",
         "error": None,
     }

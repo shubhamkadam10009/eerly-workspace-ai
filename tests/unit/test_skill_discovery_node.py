@@ -1,4 +1,4 @@
-﻿from unittest.mock import MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -50,7 +50,10 @@ def test_discover_skills_returns_discovered_metadata(
         skill_discovery=mock_discovery,
     )
 
-    assert result["discovered_skills"] == expected_skills
+    assert result["discovered_skills"] == [
+        skill.model_dump()
+        for skill in expected_skills
+    ]
     assert result["status"] == "skills_discovered"
     assert result["error"] is None
 

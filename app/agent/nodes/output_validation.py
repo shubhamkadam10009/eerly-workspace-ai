@@ -1,4 +1,4 @@
-from app.agent.models import ValidationResult
+﻿from app.agent.models import ValidationResult
 from app.agent.state import AgentState
 
 
@@ -26,7 +26,7 @@ def validate_output(state: AgentState) -> dict:
     )
 
     return {
-        "validation_result": result,
+        "validation_result": result.model_dump(),
         "status": (
             "output_validated"
             if result.valid

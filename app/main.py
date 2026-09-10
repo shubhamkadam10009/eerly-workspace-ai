@@ -1,8 +1,15 @@
+
+
 from fastapi import FastAPI
 
 from app.api.agent import router as agent_router
 from app.api.health import router as health_router
 
+import asyncio
+import sys
+
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 app = FastAPI(
     title="Eerly Workspace AI",

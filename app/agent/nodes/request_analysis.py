@@ -19,10 +19,13 @@ def analyze_request(
 
     if not available_skills:
         discovery = skill_discovery or SkillDiscovery()
-        available_skills = discovery.discover()
+        available_skills = [
+            skill.model_dump()
+            for skill in discovery.discover()
+        ]
 
     available_skills_text = "\n".join(
-        f"- {skill.name}: {skill.description}"
+        f"- {skill["name"]}: {skill["description"]}"
         for skill in available_skills
     )
 
@@ -35,7 +38,7 @@ def analyze_request(
     analysis = llm.invoke(messages)
 
     available_skill_names = {
-        skill.name
+        skill["name"]
         for skill in available_skills
     }
 
@@ -51,7 +54,7 @@ def analyze_request(
         )
 
     return {
-        "request_analysis": analysis,
+        "request_analysis": analysis.model_dump(),
         "selected_skills": analysis.selected_skills,
         "status": "request_analyzed",
         "error": None,

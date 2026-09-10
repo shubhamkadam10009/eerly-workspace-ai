@@ -1,0 +1,52 @@
+﻿/* Eerly Workspace AI - Frontend */
+
+.hero {
+    padding: 2.5rem 2rem;
+    margin-bottom: 2rem;
+    border: 1px solid rgba(128, 128, 128, 0.25);
+    border-radius: 20px;
+    background: linear-gradient(
+        135deg,
+        rgba(128, 128, 128, 0.12),
+        rgba(128, 128, 128, 0.04)
+    );
+}
+
+.hero-badge {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    opacity: 0.7;
+    margin-bottom: 0.75rem;
+}
+
+.hero h1 {
+    margin: 0;
+    font-size: 2.8rem;
+    font-weight: 750;
+}
+
+.hero p {
+    margin-top: 0.8rem;
+    max-width: 800px;
+    font-size: 1.05rem;
+    line-height: 1.7;
+    opacity: 0.75;
+}
+
+div[data-testid="stButton"] button {
+    border-radius: 10px;
+    min-height: 2.7rem;
+}
+
+div[data-testid="stTextArea"] textarea {
+    border-radius: 12px;
+}
+
+div[data-testid="stTextInput"] input {
+    border-radius: 10px;
+}
+
+[data-testid="stSidebar"] {
+    border-right: 1px solid rgba(128, 128, 128, 0.18);
+}

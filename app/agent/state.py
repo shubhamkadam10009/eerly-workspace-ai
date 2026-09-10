@@ -11,8 +11,6 @@ from app.skills.models import SkillMetadata
 
 
 class AgentState(TypedDict):
-    """Shared state passed between LangGraph nodes."""
-
     user_id: str
     thread_id: str
     request: str
@@ -32,6 +30,11 @@ class AgentState(TypedDict):
     generated_artifact: ArtifactReference | None
 
     validation_result: ValidationResult | None
+
+    approval_request: dict | None
+    approval_status: str | None
+    approval_decision: str | None
+    approval_feedback: str | None
 
     status: str
     error: str | None

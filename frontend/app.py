@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import queue
 import threading
@@ -56,6 +56,7 @@ def initialize_state() -> None:
         "error": None,
         "stream_error": None,
         "approval_edit_mode": False,
+        "session_history": {},
     }
 
     for key, value in defaults.items():
@@ -63,8 +64,68 @@ def initialize_state() -> None:
             st.session_state[key] = value
 
 
+def _current_session_snapshot() -> dict[str, Any] | None:
+    """Capture the current UI state for session-history navigation."""
+
+    thread_id = st.session_state.get("thread_id")
+    if not thread_id:
+        return None
+
+    return {
+        "thread_id": thread_id,
+        "events": list(st.session_state.get("events", [])),
+        "result": st.session_state.get("result"),
+        "approval_request": st.session_state.get("approval_request"),
+        "running": st.session_state.get("running", False),
+        "error": st.session_state.get("error"),
+        "stream_error": st.session_state.get("stream_error"),
+        "approval_edit_mode": st.session_state.get(
+            "approval_edit_mode",
+            False,
+        ),
+    }
+
+
+def _save_current_session() -> None:
+    """Save the current UI state without deleting the durable backend thread."""
+
+    snapshot = _current_session_snapshot()
+    if snapshot is None:
+        return
+
+    thread_id = snapshot["thread_id"]
+    st.session_state["session_history"][thread_id] = snapshot
+
+
+def _restore_session(thread_id: str) -> None:
+    """Restore a previously viewed session from frontend history."""
+
+    history = st.session_state.get("session_history", {})
+    snapshot = history.get(thread_id)
+
+    if snapshot is None:
+        return
+
+    st.session_state["thread_id"] = snapshot["thread_id"]
+    st.session_state["events"] = list(snapshot["events"])
+    st.session_state["result"] = snapshot["result"]
+    st.session_state["approval_request"] = snapshot[
+        "approval_request"
+    ]
+    st.session_state["running"] = snapshot["running"]
+    st.session_state["error"] = snapshot["error"]
+    st.session_state["stream_error"] = snapshot[
+        "stream_error"
+    ]
+    st.session_state["approval_edit_mode"] = snapshot[
+        "approval_edit_mode"
+    ]
+
+
 def reset_execution() -> None:
-    """Reset the current agent execution."""
+    """Start a new UI session without deleting previous sessions."""
+
+    _save_current_session()
 
     st.session_state["thread_id"] = None
     st.session_state["events"] = []
@@ -115,32 +176,68 @@ def render_sidebar() -> str:
 
         st.markdown("### Session")
 
-        current_thread = st.session_state.get(
-            "thread_id"
-        )
+        current_thread = st.session_state.get("thread_id")
 
         if current_thread:
             st.caption("Current thread")
             st.code(current_thread)
 
+        new_session_disabled = (
+            st.session_state.get("running", False)
+        )
+
         if st.button(
             "New Session",
             use_container_width=True,
+            disabled=new_session_disabled,
         ):
             reset_execution()
             st.rerun()
 
+        history = st.session_state.get(
+            "session_history",
+            {},
+        )
+
+        if history:
+            st.divider()
+            st.markdown("### Previous Sessions")
+
+            for thread_id, snapshot in reversed(
+                list(history.items())
+            ):
+                if thread_id == current_thread:
+                    continue
+
+                result = snapshot.get("result") or {}
+                status = result.get(
+                    "status",
+                    "saved",
+                )
+
+                label = (
+                    f"{thread_id[:8]}... "
+                    f"· {status}"
+                )
+
+                if st.button(
+                    label,
+                    key=f"session_{thread_id}",
+                    use_container_width=True,
+                ):
+                    _save_current_session()
+                    _restore_session(thread_id)
+                    st.rerun()
+
         st.divider()
 
         st.caption(
-            "The frontend is a thin client. "
-            "Authentication, LangGraph, Gemini, "
-            "PostgreSQL, and workspace security "
-            "remain on the API."
+            "Previous sessions remain available in this "
+            "browser session. Durable agent state is stored "
+            "by LangGraph/PostgreSQL."
         )
 
     return token
-
 
 def _consume_events(
     client: EerlyAPIClient,

@@ -100,6 +100,10 @@ async def stream_agent_events(
         queue = event_bus.subscribe(stream_key)
 
         try:
+            # Explicitly signal that the server-side subscription is ready.
+            # The frontend waits for this before starting the agent run.
+            yield ": connected\n\n"
+
             while True:
                 try:
                     event = await asyncio.to_thread(

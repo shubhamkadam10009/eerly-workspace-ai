@@ -1,4 +1,4 @@
-﻿from app.agent.state import AgentState
+from app.agent.state import AgentState
 from app.tools.filesystem import read_workspace_file
 
 
@@ -14,12 +14,12 @@ def read_sources(state: AgentState) -> dict:
     source_contents: dict[str, str] = {}
 
     for workspace_file in workspace_files:
-        if workspace_file.type != "file":
+        if workspace_file["type"] != "file":
             continue
 
-        source_contents[workspace_file.path] = read_workspace_file(
+        source_contents[workspace_file["path"]] = read_workspace_file(
             user_id=user_id,
-            relative_path=workspace_file.path,
+            relative_path=workspace_file["path"],
         )
 
     return {

@@ -1,8 +1,7 @@
-﻿from unittest.mock import patch
+from unittest.mock import patch
 
 import pytest
 
-from app.agent.models import WorkspaceFile
 from app.agent.nodes.source_reading import read_sources
 from app.agent.state import AgentState
 
@@ -17,21 +16,21 @@ def base_state() -> AgentState:
         "selected_skills": [],
         "loaded_skills": {},
         "workspace_files": [
-            WorkspaceFile(
-                name="report.txt",
-                path="input/report.txt",
-                type="file",
-            ),
-            WorkspaceFile(
-                name="notes.md",
-                path="input/notes.md",
-                type="file",
-            ),
-            WorkspaceFile(
-                name="archive",
-                path="input/archive",
-                type="directory",
-            ),
+            {
+                "name": "report.txt",
+                "path": "input/report.txt",
+                "type": "file",
+            },
+            {
+                "name": "notes.md",
+                "path": "input/notes.md",
+                "type": "file",
+            },
+            {
+                "name": "archive",
+                "path": "input/archive",
+                "type": "directory",
+            },
         ],
         "source_contents": {},
         "findings": [],

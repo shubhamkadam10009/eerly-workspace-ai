@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 from collections.abc import Callable, Iterator
@@ -155,13 +155,18 @@ class EerlyAPIClient:
                         )
                     )
 
-                if on_connected is not None:
-                    on_connected()
+                connection_notified = False
 
                 event_name: str | None = None
                 event_data: str | None = None
 
                 for line in response.iter_lines():
+                    if not connection_notified:
+                        connection_notified = True
+
+                        if on_connected is not None:
+                            on_connected()
+
                     if not line:
                         if event_data is not None:
                             event = self._parse_sse_event(

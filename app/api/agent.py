@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import asyncio
 import json
@@ -47,6 +47,7 @@ def run_workspace_agent(
         selected_skills=result["selected_skills"],
         findings=result["findings"],
         generated_output=result["generated_output"],
+        generated_artifact=result.get("generated_artifact"),
         validation_result=result["validation_result"],
         approval_required=result.get("approval_required", False),
         approval_request=result.get("approval_request"),
@@ -75,6 +76,7 @@ def resume_workspace_agent(
         approval_request=result.get("approval_request"),
         approval_decision=result.get("approval_decision"),
         generated_output=result["generated_output"],
+        generated_artifact=result.get("generated_artifact"),
         validation_result=result["validation_result"],
     )
 
@@ -139,3 +141,6 @@ async def stream_agent_events(
             "X-Accel-Buffering": "no",
         },
     )
+
+
+

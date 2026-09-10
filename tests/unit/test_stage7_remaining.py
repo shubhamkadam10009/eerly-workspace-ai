@@ -187,7 +187,7 @@ def test_initial_state_contains_required_execution_identity():
 def test_thread_ids_are_user_namespaced():
     from app.agent.service import run_agent
 
-    with patch("app.agent.service.get_graph") as mock_get_graph:
+    with patch("app.agent.service.get_graph") as mock_get_graph, patch("app.agent.service._ensure_user_workspace"):
         graph = MagicMock()
 
         graph.stream.return_value = [

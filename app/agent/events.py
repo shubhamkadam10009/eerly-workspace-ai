@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Literal
@@ -18,6 +18,7 @@ AgentEventType = Literal[
     "validation_completed",
     "approval_required",
     "approval_received",
+    "artifact_delivered",
     "completed",
     "rejected",
     "failed",

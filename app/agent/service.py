@@ -1,5 +1,7 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
@@ -10,6 +12,8 @@ from app.agent.event_bus import event_bus
 from app.agent.events import AgentEvent
 from app.agent.graph import get_graph
 from app.agent.models import ApprovalDecision
+from app.artifacts.service import persist_artifact
+from app.db.repository.workspace import ensure_user_workspace
 
 
 def _effective_thread_id(user_id: str, thread_id: str) -> str:
@@ -86,6 +90,7 @@ def _state_response(
         "selected_skills": state.get("selected_skills", []),
         "findings": state.get("findings", []),
         "generated_output": state.get("generated_output"),
+        "generated_artifact": state.get("generated_artifact"),
         "validation_result": state.get("validation_result"),
         "approval_required": bool(interrupt_payload),
         "approval_request": interrupt_payload,
@@ -172,8 +177,12 @@ def _node_event(node_name: str) -> tuple[str, str]:
             "Human approval is required",
         ),
         "mark_approved": (
-            "completed",
-            "Agent execution approved and completed",
+            "approval_received",
+            "Agent execution approved",
+        ),
+        "deliver_artifact": (
+            "artifact_delivered",
+            "Artifact delivered to workspace",
         ),
         "mark_rejected": (
             "rejected",
@@ -227,6 +236,90 @@ def _run_stream(
     return result
 
 
+def _ensure_user_workspace(user_id: str) -> None:
+    """Ensure the authenticated user has a database and filesystem workspace."""
+
+    async def provision() -> None:
+        await ensure_user_workspace(user_id)
+
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        asyncio.run(provision())
+        return
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        executor.submit(asyncio.run, provision()).result()
+
+def _persist_generated_artifact(
+    *,
+    user_id: str,
+    response: dict[str, Any],
+) -> None:
+    """Persist delivered artifact metadata in PostgreSQL."""
+
+    artifact = response.get("generated_artifact")
+
+    if not artifact:
+        return
+
+    async def persist() -> None:
+        await persist_artifact(
+            user_id=user_id,
+            filename=artifact["filename"],
+            relative_path=artifact["relative_path"],
+            artifact_type=artifact["artifact_type"],
+            status=artifact["status"],
+        )
+
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        asyncio.run(persist())
+        return
+
+    # The current agent service is synchronous. If this helper is ever
+    # called from an already-running event loop, execute the async
+    # persistence operation in a separate worker thread.
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        executor.submit(asyncio.run, persist()).result()
+
+
+def _publish_terminal_event(
+    *,
+    user_id: str,
+    thread_id: str,
+    response: dict[str, Any],
+) -> None:
+    if response["approval_required"]:
+        _publish_event(
+            user_id=user_id,
+            thread_id=thread_id,
+            event="approval_required",
+            status="waiting_for_approval",
+            message="Waiting for human approval",
+            data={
+                "approval_request": response["approval_request"],
+            },
+        )
+    elif response["status"] == "rejected":
+        _publish_event(
+            user_id=user_id,
+            thread_id=thread_id,
+            event="rejected",
+            status="rejected",
+            message="Agent execution was rejected",
+        )
+    elif response["status"] == "completed":
+        _publish_event(
+            user_id=user_id,
+            thread_id=thread_id,
+            event="completed",
+            status="completed",
+            message="Agent execution completed",
+        )
+
+
 def run_agent(
     user_id: str,
     request: str,
@@ -234,6 +327,8 @@ def run_agent(
 ) -> dict[str, Any]:
     if not user_id:
         raise ValueError("user_id is required")
+
+    _ensure_user_workspace(user_id)
 
     if not request or not request.strip():
         raise ValueError("request must not be empty")
@@ -281,33 +376,17 @@ def run_agent(
             result=result,
         )
 
-        if response["approval_required"]:
-            _publish_event(
+        if not response["approval_required"]:
+            _persist_generated_artifact(
                 user_id=user_id,
-                thread_id=raw_thread_id,
-                event="approval_required",
-                status="waiting_for_approval",
-                message="Waiting for human approval",
-                data={
-                    "approval_request": response["approval_request"],
-                },
+                response=response,
             )
-        elif response["status"] == "rejected":
-            _publish_event(
-                user_id=user_id,
-                thread_id=raw_thread_id,
-                event="rejected",
-                status="rejected",
-                message="Agent execution was rejected",
-            )
-        elif response["status"] == "completed":
-            _publish_event(
-                user_id=user_id,
-                thread_id=raw_thread_id,
-                event="completed",
-                status="completed",
-                message="Agent execution completed",
-            )
+
+        _publish_terminal_event(
+            user_id=user_id,
+            thread_id=raw_thread_id,
+            response=response,
+        )
 
         return response
 
@@ -330,6 +409,8 @@ def resume_agent(
 ) -> dict[str, Any]:
     if not user_id:
         raise ValueError("user_id is required")
+
+    _ensure_user_workspace(user_id)
 
     if not thread_id or not thread_id.strip():
         raise ValueError("thread_id is required")
@@ -376,33 +457,17 @@ def resume_agent(
             result=result,
         )
 
-        if response["approval_required"]:
-            _publish_event(
+        if not response["approval_required"]:
+            _persist_generated_artifact(
                 user_id=user_id,
-                thread_id=thread_id,
-                event="approval_required",
-                status="waiting_for_approval",
-                message="Updated output requires human approval",
-                data={
-                    "approval_request": response["approval_request"],
-                },
+                response=response,
             )
-        elif response["status"] == "rejected":
-            _publish_event(
-                user_id=user_id,
-                thread_id=thread_id,
-                event="rejected",
-                status="rejected",
-                message="Agent execution was rejected",
-            )
-        elif response["status"] == "completed":
-            _publish_event(
-                user_id=user_id,
-                thread_id=thread_id,
-                event="completed",
-                status="completed",
-                message="Agent execution completed",
-            )
+
+        _publish_terminal_event(
+            user_id=user_id,
+            thread_id=thread_id,
+            response=response,
+        )
 
         return response
 
@@ -416,3 +481,13 @@ def resume_agent(
             data={"error": str(exc)},
         )
         raise
+
+
+
+
+
+
+
+
+
+

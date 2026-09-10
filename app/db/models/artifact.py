@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, func
+from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -8,6 +8,14 @@ from app.db.base import Base
 
 class Artifact(Base):
     __tablename__ = "artifacts"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_id",
+            "relative_path",
+            name="uq_artifacts_workspace_relative_path",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(
         String(64),
@@ -51,3 +59,4 @@ class Artifact(Base):
     workspace: Mapped["Workspace"] = relationship(
         back_populates="artifacts",
     )
+

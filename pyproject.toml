@@ -20,6 +20,8 @@ dependencies = [
     "sqlalchemy",
     "alembic",
     "openai",
+    "langchain-openai",
+    "PyJWT",
     "streamlit",
 ]
 
@@ -29,6 +31,10 @@ dev = [
     "pytest",
     "httpx",
 ]
+
+
+[tool.setuptools.packages.find]
+include = ["app*"]
 
 
 [tool.pytest.ini_options]

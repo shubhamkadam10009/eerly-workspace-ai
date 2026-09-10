@@ -10,6 +10,8 @@ class Settings(BaseSettings):
 
     openai_api_key: SecretStr | None = None
 
+    openai_model: str = "gpt-5.6-mini"
+
     database_url: str
 
     log_level: str = "INFO"

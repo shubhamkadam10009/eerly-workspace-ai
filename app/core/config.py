@@ -8,16 +8,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_env: str = "development"
 
-    openai_api_key: SecretStr | None = None
+    llm_provider: str = "gemini"
 
-    openai_model: str = "gpt-5.6-mini"
+    gemini_api_key: SecretStr | None = None
+    gemini_model: str = "gemini-3.6-flash"
 
     database_url: str
-
     log_level: str = "INFO"
-
     jwt_secret: SecretStr
-
     workspace_root: Path = Path("/app/workspaces")
 
     model_config = SettingsConfigDict(

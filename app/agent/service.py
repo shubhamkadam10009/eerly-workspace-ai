@@ -1,16 +1,23 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
 from langgraph.types import Command
 
+from app.agent.event_bus import event_bus
+from app.agent.events import AgentEvent
 from app.agent.graph import get_graph
 from app.agent.models import ApprovalDecision
 
 
 def _effective_thread_id(user_id: str, thread_id: str) -> str:
     return f"{user_id}:{thread_id}"
+
+
+def _stream_key(user_id: str, thread_id: str) -> str:
+    return _effective_thread_id(user_id, thread_id)
 
 
 def build_initial_state(
@@ -87,6 +94,139 @@ def _state_response(
     }
 
 
+def _make_event(
+    *,
+    event: str,
+    thread_id: str,
+    status: str,
+    message: str,
+    data: dict | None = None,
+) -> AgentEvent:
+    return AgentEvent(
+        event=event,
+        thread_id=thread_id,
+        status=status,
+        message=message,
+        timestamp=datetime.now(timezone.utc),
+        data=data or {},
+    )
+
+
+def _publish_event(
+    *,
+    user_id: str,
+    thread_id: str,
+    event: str,
+    status: str,
+    message: str,
+    data: dict | None = None,
+) -> None:
+    event_bus.publish(
+        _stream_key(user_id, thread_id),
+        _make_event(
+            event=event,
+            thread_id=thread_id,
+            status=status,
+            message=message,
+            data=data,
+        ),
+    )
+
+
+def _node_event(node_name: str) -> tuple[str, str]:
+    mapping = {
+        "discover_skills": (
+            "skills_discovered",
+            "Skill discovery completed",
+        ),
+        "analyze_request": (
+            "request_analyzed",
+            "Request analysis completed",
+        ),
+        "load_skills": (
+            "skills_loaded",
+            "Required skills loaded",
+        ),
+        "inspect_workspace": (
+            "workspace_inspected",
+            "Workspace inspection completed",
+        ),
+        "read_sources": (
+            "sources_read",
+            "Source files read",
+        ),
+        "analyze_content": (
+            "analysis_completed",
+            "Content analysis completed",
+        ),
+        "generate_output": (
+            "output_generated",
+            "Output generation completed",
+        ),
+        "validate_output": (
+            "validation_completed",
+            "Output validation completed",
+        ),
+        "prepare_approval": (
+            "approval_required",
+            "Human approval is required",
+        ),
+        "mark_approved": (
+            "completed",
+            "Agent execution approved and completed",
+        ),
+        "mark_rejected": (
+            "rejected",
+            "Agent execution was rejected",
+        ),
+    }
+
+    return mapping.get(
+        node_name,
+        (
+            "request_analyzed",
+            f"Agent node '{node_name}' completed",
+        ),
+    )
+
+
+def _run_stream(
+    graph,
+    input_data: Any,
+    config: dict[str, Any],
+    user_id: str,
+    raw_thread_id: str,
+) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+
+    for chunk in graph.stream(
+        input_data,
+        config=config,
+        stream_mode="updates",
+    ):
+        result.update(chunk)
+
+        for node_name in chunk:
+            event_name, message = _node_event(node_name)
+
+            status = (
+                "waiting_for_approval"
+                if event_name == "approval_required"
+                else "running"
+            )
+
+            _publish_event(
+                user_id=user_id,
+                thread_id=raw_thread_id,
+                event=event_name,
+                status=status,
+                message=message,
+                data={"node": node_name},
+            )
+
+    return result
+
+
 def run_agent(
     user_id: str,
     request: str,
@@ -99,6 +239,7 @@ def run_agent(
         raise ValueError("request must not be empty")
 
     raw_thread_id = thread_id or str(uuid4())
+
     effective_thread_id = _effective_thread_id(
         user_id,
         raw_thread_id,
@@ -106,25 +247,80 @@ def run_agent(
 
     graph = get_graph()
 
-    result = graph.invoke(
-        build_initial_state(
-            user_id=user_id,
-            thread_id=raw_thread_id,
-            request=request,
-        ),
-        config={
-            "configurable": {
-                "thread_id": effective_thread_id,
-            }
-        },
+    _publish_event(
+        user_id=user_id,
+        thread_id=raw_thread_id,
+        event="request_received",
+        status="running",
+        message="Agent request received",
     )
 
-    return _state_response(
-        graph=graph,
-        effective_thread_id=effective_thread_id,
-        raw_thread_id=raw_thread_id,
-        result=result,
-    )
+    config = {
+        "configurable": {
+            "thread_id": effective_thread_id,
+        }
+    }
+
+    try:
+        result = _run_stream(
+            graph=graph,
+            input_data=build_initial_state(
+                user_id=user_id,
+                thread_id=raw_thread_id,
+                request=request,
+            ),
+            config=config,
+            user_id=user_id,
+            raw_thread_id=raw_thread_id,
+        )
+
+        response = _state_response(
+            graph=graph,
+            effective_thread_id=effective_thread_id,
+            raw_thread_id=raw_thread_id,
+            result=result,
+        )
+
+        if response["approval_required"]:
+            _publish_event(
+                user_id=user_id,
+                thread_id=raw_thread_id,
+                event="approval_required",
+                status="waiting_for_approval",
+                message="Waiting for human approval",
+                data={
+                    "approval_request": response["approval_request"],
+                },
+            )
+        elif response["status"] == "rejected":
+            _publish_event(
+                user_id=user_id,
+                thread_id=raw_thread_id,
+                event="rejected",
+                status="rejected",
+                message="Agent execution was rejected",
+            )
+        elif response["status"] == "completed":
+            _publish_event(
+                user_id=user_id,
+                thread_id=raw_thread_id,
+                event="completed",
+                status="completed",
+                message="Agent execution completed",
+            )
+
+        return response
+
+    except Exception as exc:
+        _publish_event(
+            user_id=user_id,
+            thread_id=raw_thread_id,
+            event="failed",
+            status="failed",
+            message="Agent execution failed",
+            data={"error": str(exc)},
+        )
+        raise
 
 
 def resume_agent(
@@ -145,18 +341,78 @@ def resume_agent(
 
     graph = get_graph()
 
-    result = graph.invoke(
-        Command(resume=decision.model_dump()),
-        config={
-            "configurable": {
-                "thread_id": effective_thread_id,
-            }
+    _publish_event(
+        user_id=user_id,
+        thread_id=thread_id,
+        event="approval_received",
+        status="resuming",
+        message="Human approval decision received",
+        data={
+            "decision": decision.decision,
         },
     )
 
-    return _state_response(
-        graph=graph,
-        effective_thread_id=effective_thread_id,
-        raw_thread_id=thread_id,
-        result=result,
-    )
+    config = {
+        "configurable": {
+            "thread_id": effective_thread_id,
+        }
+    }
+
+    try:
+        result = _run_stream(
+            graph=graph,
+            input_data=Command(
+                resume=decision.model_dump()
+            ),
+            config=config,
+            user_id=user_id,
+            raw_thread_id=thread_id,
+        )
+
+        response = _state_response(
+            graph=graph,
+            effective_thread_id=effective_thread_id,
+            raw_thread_id=thread_id,
+            result=result,
+        )
+
+        if response["approval_required"]:
+            _publish_event(
+                user_id=user_id,
+                thread_id=thread_id,
+                event="approval_required",
+                status="waiting_for_approval",
+                message="Updated output requires human approval",
+                data={
+                    "approval_request": response["approval_request"],
+                },
+            )
+        elif response["status"] == "rejected":
+            _publish_event(
+                user_id=user_id,
+                thread_id=thread_id,
+                event="rejected",
+                status="rejected",
+                message="Agent execution was rejected",
+            )
+        elif response["status"] == "completed":
+            _publish_event(
+                user_id=user_id,
+                thread_id=thread_id,
+                event="completed",
+                status="completed",
+                message="Agent execution completed",
+            )
+
+        return response
+
+    except Exception as exc:
+        _publish_event(
+            user_id=user_id,
+            thread_id=thread_id,
+            event="failed",
+            status="failed",
+            message="Agent resume failed",
+            data={"error": str(exc)},
+        )
+        raise

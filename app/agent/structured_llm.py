@@ -1,6 +1,6 @@
 from typing import Any
 
-from langchain_openai import ChatOpenAI
+from langchain_core.language_models.chat_models import BaseChatModel
 
 from app.agent.llm import get_llm
 from app.agent.models import FindingCollection, RequestAnalysis
@@ -17,28 +17,26 @@ from app.agent.prompts import (
 def get_request_analysis_llm() -> Any:
     """Return an LLM configured for structured request analysis."""
 
-    llm: ChatOpenAI = get_llm()
+    llm: BaseChatModel = get_llm()
 
     return llm.with_structured_output(
         RequestAnalysis,
         method="json_schema",
-        strict=True,
     )
 
 
 def get_content_analysis_llm() -> Any:
     """Return an LLM configured for structured content analysis."""
 
-    llm: ChatOpenAI = get_llm()
+    llm: BaseChatModel = get_llm()
 
     return llm.with_structured_output(
         FindingCollection,
         method="json_schema",
-        strict=True,
     )
 
 
-def get_report_generation_llm() -> ChatOpenAI:
+def get_report_generation_llm() -> BaseChatModel:
     """Return the configured LLM for report generation."""
 
     return get_llm()

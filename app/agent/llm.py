@@ -1,21 +1,11 @@
-﻿from functools import lru_cache
+from functools import lru_cache
 
-from langchain_openai import ChatOpenAI
+from langchain_core.language_models.chat_models import BaseChatModel
 
-from app.core.config import get_settings
+from app.llm.factory import get_chat_model
 
 
 @lru_cache
-def get_llm() -> ChatOpenAI:
-    """Create and cache the application's OpenAI chat model."""
-
-    settings = get_settings()
-
-    if settings.openai_api_key is None:
-        raise ValueError("OPENAI_API_KEY is not configured")
-
-    return ChatOpenAI(
-        model=settings.openai_model,
-        api_key=settings.openai_api_key.get_secret_value(),
-        temperature=0,
-    )
+def get_llm() -> BaseChatModel:
+    """Create and cache the application's configured chat model."""
+    return get_chat_model()

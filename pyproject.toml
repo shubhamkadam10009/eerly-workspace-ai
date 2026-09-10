@@ -19,8 +19,7 @@ dependencies = [
     "psycopg[binary,pool]",
     "sqlalchemy",
     "alembic",
-    "openai",
-    "langchain-openai",
+    "langchain-google-genai",
     "PyJWT",
     "streamlit",
 ]

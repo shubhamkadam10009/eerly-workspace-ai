@@ -1,7 +1,6 @@
-﻿from app.agent.models import (
+from app.agent.models import (
     ArtifactReference,
     Finding,
-    FindingCollection,
     RequestAnalysis,
     ValidationResult,
     WorkspaceFile,
@@ -12,7 +11,6 @@ __all__ = [
     "AgentState",
     "ArtifactReference",
     "Finding",
-    "FindingCollection",
     "RequestAnalysis",
     "ValidationResult",
     "WorkspaceFile",

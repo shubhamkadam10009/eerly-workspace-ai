@@ -189,7 +189,16 @@ def test_thread_ids_are_user_namespaced():
 
     with patch("app.agent.service.get_graph") as mock_get_graph:
         graph = MagicMock()
-        graph.invoke.return_value = {
+
+        graph.stream.return_value = [
+            {
+                "validate_output": {
+                    "status": "output_validated",
+                }
+            }
+        ]
+
+        graph.get_state.return_value.values = {
             "thread_id": "user_a:thread_1",
             "status": "output_validated",
             "selected_skills": [],
@@ -197,6 +206,7 @@ def test_thread_ids_are_user_namespaced():
             "generated_output": "A generated report.",
             "validation_result": ValidationResult(valid=True),
         }
+
         mock_get_graph.return_value = graph
 
         run_agent(
@@ -205,13 +215,11 @@ def test_thread_ids_are_user_namespaced():
             thread_id="thread_1",
         )
 
-        config = graph.invoke.call_args.kwargs["config"]
-        assert (
-            config["configurable"]["thread_id"]
-            == "user_a:thread_1"
-        )
+        assert graph.stream.call_args is not None
 
+        config = graph.stream.call_args.kwargs["config"]
 
+        assert config["configurable"]["thread_id"] == "user_a:thread_1"
 def test_api_rejects_missing_authentication():
     client = TestClient(app)
 

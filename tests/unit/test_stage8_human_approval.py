@@ -375,3 +375,78 @@ def test_approval_reject_model_allows_feedback():
 
     assert decision.decision == "reject"
     assert decision.feedback == "Insufficient evidence."
+def test_resume_agent_namespaces_checkpoint_by_authenticated_user():
+    from unittest.mock import MagicMock, patch
+
+    from app.agent.service import resume_agent
+
+    graph = MagicMock()
+
+    graph.stream.return_value = iter(
+        [
+            {
+                "mark_approved": {
+                    "status": "approved",
+                    "approval_decision": "approve",
+                }
+            }
+        ]
+    )
+
+    graph.get_state.return_value.values = {
+        "status": "completed",
+        "selected_skills": [],
+        "findings": [],
+        "generated_output": "Approved output.",
+        "generated_artifact": None,
+        "validation_result": {
+            "valid": True,
+            "issues": [],
+        },
+        "approval_decision": "approve",
+        "approval_feedback": None,
+    }
+
+    decision = ApprovalDecision(decision="approve")
+
+    with (
+        patch(
+            "app.agent.service._ensure_user_workspace"
+        ),
+        patch(
+            "app.agent.service.get_graph",
+            return_value=graph,
+        ),
+        patch(
+            "app.agent.service._persist_generated_artifact"
+        ),
+        patch(
+            "app.agent.service._publish_event"
+        ),
+    ):
+        resume_agent(
+            user_id="user_a",
+            thread_id="shared-thread",
+            decision=decision,
+        )
+
+        first_config = graph.stream.call_args.kwargs["config"]
+
+        resume_agent(
+            user_id="user_b",
+            thread_id="shared-thread",
+            decision=decision,
+        )
+
+        second_config = graph.stream.call_args.kwargs["config"]
+
+    first_thread_id = (
+        first_config["configurable"]["thread_id"]
+    )
+    second_thread_id = (
+        second_config["configurable"]["thread_id"]
+    )
+
+    assert first_thread_id == "user_a:shared-thread"
+    assert second_thread_id == "user_b:shared-thread"
+    assert first_thread_id != second_thread_id

@@ -344,3 +344,169 @@ def test_user_identity_is_preserved(user_id):
 
     assert state["user_id"] == user_id
     assert state["thread_id"].startswith(f"{user_id}:")
+
+def test_api_rejects_jwt_without_subject():
+    settings = get_settings()
+
+    token = jwt.encode(
+        {"role": "user"},
+        settings.jwt_secret.get_secret_value(),
+        algorithm="HS256",
+    )
+
+    client = TestClient(app)
+
+    response = client.post(
+        "/agent/run",
+        json={"request": "Create a report."},
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+    )
+
+    assert response.status_code == 401
+
+
+def test_api_rejects_jwt_with_invalid_user_identity():
+    settings = get_settings()
+
+    token = jwt.encode(
+        {"sub": "../user_b"},
+        settings.jwt_secret.get_secret_value(),
+        algorithm="HS256",
+    )
+
+    client = TestClient(app)
+
+    response = client.post(
+        "/agent/run",
+        json={"request": "Create a report."},
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+    )
+
+    assert response.status_code == 401
+
+
+def test_api_rejects_jwt_signed_with_wrong_secret():
+    settings = get_settings()
+
+    token = jwt.encode(
+        {"sub": "user_a"},
+        "definitely-not-the-configured-secret",
+        algorithm="HS256",
+    )
+
+    client = TestClient(app)
+
+    response = client.post(
+        "/agent/run",
+        json={"request": "Create a report."},
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+    )
+
+    assert response.status_code == 401
+
+
+def test_api_run_rejects_empty_request():
+    settings = get_settings()
+
+    token = jwt.encode(
+        {"sub": "user_a"},
+        settings.jwt_secret.get_secret_value(),
+        algorithm="HS256",
+    )
+
+    client = TestClient(app)
+
+    response = client.post(
+        "/agent/run",
+        json={"request": ""},
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_api_run_rejects_oversized_thread_id():
+    settings = get_settings()
+
+    token = jwt.encode(
+        {"sub": "user_a"},
+        settings.jwt_secret.get_secret_value(),
+        algorithm="HS256",
+    )
+
+    client = TestClient(app)
+
+    response = client.post(
+        "/agent/run",
+        json={
+            "request": "Create a report.",
+            "thread_id": "x" * 201,
+        },
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_api_resume_rejects_oversized_thread_id():
+    settings = get_settings()
+
+    token = jwt.encode(
+        {"sub": "user_a"},
+        settings.jwt_secret.get_secret_value(),
+        algorithm="HS256",
+    )
+
+    client = TestClient(app)
+
+    response = client.post(
+        "/agent/resume",
+        json={
+            "thread_id": "x" * 201,
+            "decision": {
+                "decision": "approve",
+            },
+        },
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_api_resume_rejects_invalid_decision():
+    settings = get_settings()
+
+    token = jwt.encode(
+        {"sub": "user_a"},
+        settings.jwt_secret.get_secret_value(),
+        algorithm="HS256",
+    )
+
+    client = TestClient(app)
+
+    response = client.post(
+        "/agent/resume",
+        json={
+            "thread_id": "thread-1",
+            "decision": {
+                "decision": "not-a-valid-decision",
+            },
+        },
+        headers={
+            "Authorization": f"Bearer {token}",
+        },
+    )
+
+    assert response.status_code == 422

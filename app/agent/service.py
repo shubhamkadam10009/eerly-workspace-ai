@@ -13,6 +13,7 @@ from app.agent.events import AgentEvent
 from app.agent.graph import get_graph
 from app.agent.models import ApprovalDecision
 from app.artifacts.service import persist_artifact
+from app.core.errors import ClientInputError
 from app.db.repository.workspace import ensure_user_workspace
 
 
@@ -330,7 +331,7 @@ def run_agent(
     _ensure_user_workspace(user_id)
 
     if not request or not request.strip():
-        raise ValueError("request must not be empty")
+        raise ClientInputError("request must not be empty")
 
     raw_thread_id = thread_id or str(uuid4())
 
@@ -412,7 +413,7 @@ def resume_agent(
     _ensure_user_workspace(user_id)
 
     if not thread_id or not thread_id.strip():
-        raise ValueError("thread_id is required")
+        raise ClientInputError("thread_id is required")
 
     effective_thread_id = _effective_thread_id(
         user_id,
@@ -480,6 +481,7 @@ def resume_agent(
             data={"error": str(exc)},
         )
         raise
+
 
 
 

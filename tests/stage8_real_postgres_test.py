@@ -16,17 +16,17 @@ class CheckpointState(TypedDict):
 def ask_for_approval(state: CheckpointState):
     decision = interrupt({
         "type": "approval",
-        "message": "Approve this test execution?"
+        "message": "Approve this test execution?",
     })
 
     return {
-        "approval": decision
+        "approval": decision,
     }
 
 
 def finish(state: CheckpointState):
     return {
-        "message": f"completed:{state['approval']}"
+        "message": f"completed:{state['approval']}",
     }
 
 
@@ -54,24 +54,27 @@ def main():
 
     thread_id = f"stage8-real-test-{uuid.uuid4()}"
 
+    config = {
+        "configurable": {
+            "thread_id": thread_id,
+        }
+    }
+
     print("=" * 70)
     print("STAGE 8 REAL POSTGRESQL INTERRUPT/RESUME TEST")
     print("=" * 70)
     print(f"Thread ID: {thread_id}")
     print()
 
+    # ------------------------------------------------------------------
+    # Execution 1: start the workflow and persist the interrupted state.
+    # ------------------------------------------------------------------
     with PostgresSaver.from_conn_string(conninfo) as checkpointer:
         checkpointer.setup()
 
         graph = build_graph(checkpointer)
 
-        config = {
-            "configurable": {
-                "thread_id": thread_id
-            }
-        }
-
-        print("[1/5] Starting graph...")
+        print("[1/6] Starting graph...")
         first_result = graph.invoke(
             {
                 "message": "Stage 8 durability test",
@@ -79,8 +82,6 @@ def main():
             },
             config,
         )
-
-        print("      Graph paused at interrupt.")
 
         interrupts = first_result.get("__interrupt__", [])
 
@@ -90,7 +91,7 @@ def main():
         print(f"      Interrupt payload: {interrupts[0].value}")
         print()
 
-        print("[2/5] Checking persisted PostgreSQL state...")
+        print("[2/6] Checking persisted PostgreSQL state...")
 
         checkpoint_state = graph.get_state(config)
 
@@ -101,21 +102,45 @@ def main():
             "Stage 8 durability test", \
             "FAIL: Persisted state does not contain expected message."
 
+        assert checkpoint_state.values["approval"] is None, \
+            "FAIL: Unexpected approval value before resume."
+
         print("      PASS: Checkpoint exists in PostgreSQL.")
         print(f"      Persisted values: {checkpoint_state.values}")
         print()
 
-        print("[3/5] Resuming with approval...")
+    # ------------------------------------------------------------------
+    # Execution 1 is now completely closed.
+    #
+    # We deliberately create a NEW checkpointer and NEW graph below.
+    # The workflow must recover from PostgreSQL rather than relying on
+    # the original in-memory graph/checkpointer objects.
+    # ------------------------------------------------------------------
 
-        final_result = graph.invoke(
+    print("[3/6] Simulating execution restart...")
+    print("      Original graph and checkpointer have been closed.")
+    print()
+
+    # ------------------------------------------------------------------
+    # Execution 2: create completely new graph/checkpointer instances
+    # and resume the same persisted thread.
+    # ------------------------------------------------------------------
+    with PostgresSaver.from_conn_string(conninfo) as new_checkpointer:
+        new_checkpointer.setup()
+
+        resumed_graph = build_graph(new_checkpointer)
+
+        print("[4/6] Resuming persisted workflow with a new graph...")
+
+        final_result = resumed_graph.invoke(
             Command(resume="approved"),
             config,
         )
 
-        print("      PASS: Graph resumed.")
+        print("      PASS: Graph resumed after execution restart.")
         print()
 
-        print("[4/5] Verifying final execution...")
+        print("[5/6] Verifying final execution...")
 
         assert final_result["approval"] == "approved", \
             "FAIL: Approval value was not persisted."
@@ -127,9 +152,9 @@ def main():
         print(f"      Final result: {final_result}")
         print()
 
-        print("[5/5] Verifying no interrupt remains...")
+        print("[6/6] Verifying no interrupt remains...")
 
-        final_state = graph.get_state(config)
+        final_state = resumed_graph.get_state(config)
 
         assert not final_state.interrupts, \
             "FAIL: Graph still has an active interrupt."
@@ -138,14 +163,18 @@ def main():
         print()
 
     print("=" * 70)
-    print("STAGE 8 REAL POSTGRESQL TEST PASSED")
+    print("STAGE 8 REAL POSTGRESQL DURABILITY TEST PASSED")
     print("=" * 70)
     print()
     print("Verified:")
     print("  PASS - LangGraph interrupt()")
     print("  PASS - PostgreSQL checkpoint persistence")
     print("  PASS - persisted state retrieval")
+    print("  PASS - original execution closed")
+    print("  PASS - NEW checkpointer created")
+    print("  PASS - NEW graph created")
     print("  PASS - Command(resume=...)")
+    print("  PASS - workflow recovery after restart")
     print("  PASS - graph continuation")
     print("  PASS - final state")
     print("  PASS - interrupt cleared after resume")

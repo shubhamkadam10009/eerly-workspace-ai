@@ -78,7 +78,9 @@ The frontend requires a JWT bearer token.
 After activating `.venv`, you can generate a local development token with:
 
 ```powershell
-python -c "import jwt; print(jwt.encode({'sub':'user_b'}, 'YOUR_JWT_SECRET', algorithm='HS256'))"
+$TOKEN = docker compose exec -T api python -c "from app.core.config import get_settings; import jwt; print(jwt.encode({'sub':'user_b'}, get_settings().jwt_secret.get_secret_value(), algorithm='HS256'))"
+$TOKEN = $TOKEN.Trim()
+$TOKEN
 ```
 
 Replace `YOUR_JWT_SECRET` with the exact value from `.env`.
